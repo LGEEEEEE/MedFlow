@@ -71,6 +71,7 @@ model Exame {
   justificativa String
   observacoes   String?
   status        String      @default("PENDENTE")
+  laudoPdf      String?
   createdAt     DateTime    @default(now())
 }
 

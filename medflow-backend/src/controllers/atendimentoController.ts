@@ -20,8 +20,8 @@ export class AtendimentoController {
   async buscarCpf(req: Request, res: Response) {
     try {
       const { cpf } = req.params;
-      const paciente = await prisma.paciente.findUnique({ where: { cpf } });
-      
+      const paciente = await prisma.paciente.findUnique({ where: { cpf: cpf as string } });
+
       if (!paciente) {
         return res.status(404).json({ error: 'Paciente nao encontrado' });
       }
@@ -30,13 +30,54 @@ export class AtendimentoController {
       return res.status(500).json({ erro: 'Erro ao buscar paciente' });
     }
   }
+  // Adicione este método na classe AtendimentoController
+  async salvarLaudoExame(req: Request, res: Response) {
+    try {
+      const { exameId } = req.params;
+      const { laudoPdf, resultado } = req.body;
+
+      // 1. Atualiza apenas o exame específico com o PDF e finaliza ele
+      const exameAtualizado = await prisma.exame.update({
+        where: { id: exameId as string },
+        data: {
+          status: 'FINALIZADO',
+          laudoPdf: laudoPdf, // Aqui entra o Base64 ou URL do PDF
+        }
+      });
+
+      // 2. Anexa o laudo em texto ao prontuário do atendimento (opcional, mas recomendado)
+      const atendimentoAtual = await prisma.atendimento.findUnique({
+        where: { id: exameAtualizado.atendimentoId }
+      });
+
+      const novoSintomas = (atendimentoAtual?.sintomas || '') +
+        `\n\n--- LAUDO DO EXAME: ${exameAtualizado.exame} ---\n${resultado || 'Vide PDF anexo.'}`;
+
+      // 3. Atualiza o atendimento principal para o paciente voltar ao consultório
+      await prisma.atendimento.update({
+        where: { id: exameAtualizado.atendimentoId },
+        data: {
+          status: 'AGUARDANDO_RETORNO',
+          sintomas: novoSintomas
+        }
+      });
+
+      // 4. Atualiza a tela de todo mundo
+      req.app.get('io').emit('atualizar_fila');
+
+      return res.json(exameAtualizado);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ erro: 'Erro ao salvar o laudo' });
+    }
+  }
 
   async criar(req: Request, res: Response) {
     try {
-      const { 
-        nome, cpf, data_nascimento, sexo, whatsapp, cep, endereco, numero, 
-        bairro, cidade, uf, nome_mae, nome_responsavel, cpf_responsavel, 
-        parentesco, convenio, numero_guia, servicoId, status 
+      const {
+        nome, cpf, data_nascimento, sexo, whatsapp, cep, endereco, numero,
+        bairro, cidade, uf, nome_mae, nome_responsavel, cpf_responsavel,
+        parentesco, convenio, numero_guia, servicoId, status
       } = req.body;
 
       if (!cpf) {
@@ -72,13 +113,13 @@ export class AtendimentoController {
         });
       } else {
         paciente = await prisma.paciente.create({
-          data: { 
-            nome, cpf, data_nascimento: data_nascimento ? new Date(data_nascimento) : new Date('1900-01-01'), 
-            sexo: sexo || 'N/A', whatsapp: whatsapp || '', cep: cep || '', 
-            endereco: endereco || '', numero: numero || '', bairro: bairro || '', 
-            cidade: cidade || '', uf: uf || '', nome_mae: nome_mae || '', 
-            nome_responsavel: nome_responsavel || '', cpf_responsavel: cpf_responsavel || '', 
-            parentesco: parentesco || '' 
+          data: {
+            nome, cpf, data_nascimento: data_nascimento ? new Date(data_nascimento) : new Date('1900-01-01'),
+            sexo: sexo || 'N/A', whatsapp: whatsapp || '', cep: cep || '',
+            endereco: endereco || '', numero: numero || '', bairro: bairro || '',
+            cidade: cidade || '', uf: uf || '', nome_mae: nome_mae || '',
+            nome_responsavel: nome_responsavel || '', cpf_responsavel: cpf_responsavel || '',
+            parentesco: parentesco || ''
           }
         });
       }
@@ -112,7 +153,7 @@ export class AtendimentoController {
       const { status, sintomas, diagnostico, prescricao } = req.body;
 
       const atendimento = await prisma.atendimento.update({
-        where: { id },
+        where: { id: id as string },
         data: { status, sintomas, diagnostico, prescricao },
         include: { paciente: true }
       });
@@ -135,7 +176,8 @@ export class AtendimentoController {
       const { categoria, exame, prioridade, justificativa, observacoes } = req.body;
 
       const novoExame = await prisma.exame.create({
-        data: { atendimentoId: id, categoria, exame, prioridade, justificativa, observacoes }
+        // ADICIONADO 'as string' NO atendimentoId AQUI
+        data: { atendimentoId: id as string, categoria, exame, prioridade, justificativa, observacoes }
       });
 
       req.app.get('io').emit('novo_exame_sadt');
@@ -149,7 +191,7 @@ export class AtendimentoController {
   async deletar(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      await prisma.atendimento.delete({ where: { id } });
+      await prisma.atendimento.delete({ where: { id: id as string } }); // <-- ADICIONADO 'as string' AQUI
       req.app.get('io').emit('atualizar_fila');
       return res.status(204).send();
     } catch (error) {

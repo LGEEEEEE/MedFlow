@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { io } from 'socket.io-client';
 
+const PORT = import.meta.env.VITE_PORT || 3001;
+const URLPADRAO = `http://localhost:${PORT}`;
+
 export default function Triagem() {
   const [fila, setFila] = useState([]);
   const [pacienteAtual, setPacienteAtual] = useState(null);
@@ -26,7 +29,7 @@ export default function Triagem() {
   useEffect(() => {
     carregarFila();
 
-    const socket = io(api.defaults.baseURL || 'http://localhost:3333');
+    const socket = io(api.defaults.baseURL || URLPADRAO);
 
     socket.on('novo_atendimento', carregarFila);
     socket.on('atualizar_fila', carregarFila);

@@ -8,6 +8,9 @@ export default function Exames() {
   const [resultado, setResultado] = useState('');
   const [laudoPdf, setLaudoPdf] = useState('');
 
+  const PORT = import.meta.env.VITE_PORT || 3001;
+const URLPADRAO = `http://localhost:${PORT}`;
+
   const carregarFilaSADT = async () => {
     try {
       const res = await api.get('/atendimentos');
@@ -16,18 +19,19 @@ export default function Exames() {
       let examesExtraidos = [];
 
       atendimentosTotais.forEach(atendimento => {
-        if (atendimento.exames && atendimento.exames.length > 0) {
+        // A MÁGICA ACONTECE AQUI: O paciente só aparece se o status geral for AGUARDANDO_EXAME
+        if (atendimento.status === 'AGUARDANDO_EXAME' && atendimento.exames && atendimento.exames.length > 0) {
           atendimento.exames.forEach(exame => {
-            if (exame.status === 'PENDENTE') {
-              examesExtraidos.push({
-                ...exame,
-                paciente: atendimento.paciente,
-                medicoSintomas: atendimento.sintomas
-              });
-            }
+             examesExtraidos.push({
+               ...exame,
+               paciente: atendimento.paciente,
+               medicoSintomas: atendimento.sintomas
+             });
           });
         }
       });
+
+      
 
       examesExtraidos.sort((a, b) => {
         if (a.prioridade === 'Vermelho') return -1;
@@ -46,7 +50,7 @@ export default function Exames() {
   useEffect(() => {
     carregarFilaSADT();
 
-    const socket = io(api.defaults.baseURL || 'http://localhost:3333');
+    const socket = io(api.defaults.baseURL || URLPADRAO);
 
     socket.on('novo_exame_sadt', carregarFilaSADT);
     socket.on('atualizar_fila', carregarFilaSADT);
@@ -63,9 +67,15 @@ export default function Exames() {
   const finalizarExame = async (e) => {
     e.preventDefault();
     try {
+      // Pega o que o médico já tinha escrito e anexa o laudo novo embaixo
+      const prontuarioComLaudo = (exameAtual.medicoSintomas || '') + 
+        `\n\n--- LAUDO DO EXAME: ${exameAtual.exame.toUpperCase()} ---\n${resultado}`;
+
       await api.put(`/atendimentos/${exameAtual.atendimentoId}/status`, {
         status: 'AGUARDANDO_RETORNO',
+        sintomas: prontuarioComLaudo // Salva o laudo dentro do histórico do atendimento
       });
+      
       setExameAtual(null);
       setResultado('');
       setLaudoPdf('');

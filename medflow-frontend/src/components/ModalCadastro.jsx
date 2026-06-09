@@ -155,9 +155,19 @@ export default function ModalCadastro({ fecharModal, atualizarFila }) {
             <input type="text" placeholder="Parentesco" value={parentesco} onChange={e => setParentesco(e.target.value)} maxLength="50" style={inputStyle} />
             
             <select value={convenio} onChange={e => setConvenio(e.target.value)} style={inputStyle}>
-              <option value="PARTICULAR">PARTICULAR</option>
-              <option value="UNIMED">UNIMED</option>
-              <option value="BRADESCO">BRADESCO SAÚDE</option>
+                    <option value="PARTICULAR">Particular</option>
+                    <option value="ALLIANZ">Allianz Saúde</option>
+                    <option value="AMIL">Amil</option>
+                    <option value="BRADESCO">Bradesco Saúde</option>
+                    <option value="CASSI">Cassi</option>
+                    <option value="GDF_SAUDE">GDF Saúde</option>
+                    <option value="GEAP">Geap</option>
+                    <option value="HAPVIDA">Hapvida</option>
+                    <option value="MEDSENIOR">MedSenior</option>
+                    <option value="NOTREDAME">NotreDame Intermédica</option>
+                    <option value="PORTO_SEGURO">Porto Seguro</option>
+                    <option value="SULAMERICA">SulAmérica</option>
+                    <option value="UNIMED">Unimed</option>
             </select>
             <input type="text" placeholder="Nº Carteirinha (Convênio)" value={numCarteirinha} onChange={e => setNumCarteirinha(e.target.value)} maxLength="30" style={inputStyle} />
           </div>

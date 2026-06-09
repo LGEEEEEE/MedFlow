@@ -6,8 +6,7 @@ import { router } from './routes';
 
 const app = express();
 const server = http.createServer(app);
-const PORT = 3001;
-
+const PORT = process.env.PORT || 3001;
 const io = new Server(server, {
   cors: {
     origin: '*',

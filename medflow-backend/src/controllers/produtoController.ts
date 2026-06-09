@@ -14,22 +14,25 @@ export class ProdutoController {
   }
 
   async criar(req: Request, res: Response) {
-    try {
-      const { nome, quantidade, unidade, precoCusto, validade } = req.body;
-      const produto = await prisma.produto.create({
-        data: {
-          nome,
-          quantidade: Number(quantidade),
-          unidade,
-          precoCusto: Number(precoCusto),
-          validade: validade ? new Date(validade) : null
-        }
-      });
-      return res.json(produto);
-    } catch (error) {
-      return res.status(500).json({ erro: 'Erro ao cadastrar produto' });
-    }
+  try {
+    const { nome, quantidade, unidade, precoCusto, validade } = req.body;
+
+    const produto = await prisma.produto.create({
+      data: {
+        nome,
+        quantidade: Number(quantidade),
+        // Se 'unidade' vier vazio, assume 'un'. Se 'precoCusto' vier vazio, assume 0.
+        unidade: unidade || 'un', 
+        precoCusto: Number(precoCusto || 0), 
+        validade: validade ? new Date(validade) : null
+      }
+    });
+    return res.json(produto);
+  } catch (error) {
+    console.error(error); // Isso vai mostrar o erro real no log do terminal
+    return res.status(500).json({ erro: 'Erro ao cadastrar produto' });
   }
+}
 
   async baixaAutomatica(req: Request, res: Response) {
     try {
@@ -37,7 +40,7 @@ export class ProdutoController {
       const { quantidade } = req.body;
 
       const produto = await prisma.produto.update({
-        where: { id },
+        where: { id: id as string },
         data: {
           quantidade: {
             decrement: Number(quantidade || 1)

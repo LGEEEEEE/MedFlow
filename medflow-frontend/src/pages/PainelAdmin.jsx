@@ -290,7 +290,7 @@ export default function PainelAdmin() {
                 {usuarios.map(u => (
                   <tr key={u.id}>
                     <td>{u.nome}</td>
-                    <td>{u.cpf || 'N/A'}<br/><small>{u.registro || 'Sem Registro'}</small></td>
+                    <td>{u.cpf || 'N/A'}<br /><small>{u.registro || 'Sem Registro'}</small></td>
                     <td>{u.telefone || 'N/A'}</td>
                     <td>{u.cargo}</td>
                     <td>
@@ -348,7 +348,7 @@ export default function PainelAdmin() {
         )}
 
         {abaAtiva === 'financeiro' && (
-          <div style={{ ...panelWhite, ...fadeAnimation }}>
+          <div style={{ ...panelWhite, ...fadeAnimation }} className="print-area">
             <div style={flexBetween}>
               <h3 style={sectionTitle}>Extrato e Relatórios (Fluxo de Caixa)</h3>
               <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }} className="no-print">
@@ -480,15 +480,31 @@ export default function PainelAdmin() {
 
       <style dangerouslySetInnerHTML={{
         __html: `
-        @media print {
-          .no-print { display: none !important; }
-          .print-only { display: block !important; }
-          body, html, main, div { background-color: #fff !important; margin: 0; padding: 0; box-shadow: none !important; }
-          main { padding: 20px !important; }
-          table { width: 100%; border-collapse: collapse; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        }
-      `}} />
+    @media print {
+      /* Esconde tudo que não faz parte da área de impressão */
+      body * { visibility: hidden; }
+      
+      /* Mostra apenas a área de impressão */
+      .print-area, .print-area * { visibility: visible; }
+      
+      /* Posiciona a área de impressão no topo da folha */
+      .print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+      
+      /* Ajustes de layout para a folha */
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      
+      /* Garante que tabelas e textos expandam na folha */
+      table { width: 100% !important; border-collapse: collapse !important; }
+      th, td { border: 1px solid #ddd !important; padding: 8px !important; }
+    }
+  `}}
+      />
     </div>
   );
 }
