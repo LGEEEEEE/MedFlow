@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # 1. O Banco de Dados
+  db:
+    image: postgres:15-alpine
+    container_name: medflow-db
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: rootpassword
+      POSTGRES_DB: medflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # 2. A API (Node.js)
+  backend:
+    build: ./medflow-backend
+    container_name: medflow-backend
+    ports:
+      - "3001:3001"
+    environment:
+      # A URL conecta diretamente no nome do serviço "db" do compose
+      - DATABASE_URL=postgresql://root:rootpassword@db:5432/medflow?schema=public
+    volumes:
+      # Sincroniza o seu código local com o contêiner para Hot Reloading
+      - ./medflow-backend:/app
+      - /app/node_modules
+    depends_on:
+      - db
+
+  # 3. O Frontend (React + Vite)
+  frontend:
+    build: ./medflow-frontend
+    container_name: medflow-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./medflow-frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

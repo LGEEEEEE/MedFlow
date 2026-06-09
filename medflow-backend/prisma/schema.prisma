@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  senha     String
+  cargo     String
+  cpf       String?
+  whatsapp  String? 
+  registro  String?  // Adicione isso
+  telefone  String?  // Adicione isso
+  createdAt DateTime @default(now())
+
+  @@map("usuarios")
+}
+
+model Paciente {
+  id               String        @id @default(uuid())
+  nome             String
+  cpf              String        @unique
+  data_nascimento  DateTime
+  sexo             String
+  whatsapp         String
+  cep              String
+  endereco         String
+  numero           String
+  bairro           String
+  cidade           String
+  uf               String
+  nome_responsavel String?
+  cpf_responsavel  String?
+  parentesco       String?
+  nome_mae         String?
+  atendimentos     Atendimento[]
+  createdAt        DateTime      @default(now())
+}
+
+model Atendimento {
+  id          String   @id @default(uuid())
+  pacienteId  String
+  paciente    Paciente @relation(fields: [pacienteId], references: [id])
+  servicoId   String?
+  servico     Servico? @relation(fields: [servicoId], references: [id])
+  status      String   @default("AGUARDANDO")
+  prioridade  Boolean  @default(false)
+  convenio    String   @default("PARTICULAR")
+  numero_guia String?
+  sintomas    String?
+  diagnostico String?
+  prescricao  String?
+  exames      Exame[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Exame {
+  id            String      @id @default(uuid())
+  atendimentoId String
+  atendimento   Atendimento @relation(fields: [atendimentoId], references: [id], onDelete: Cascade)
+  categoria     String
+  exame         String
+  prioridade    String
+  justificativa String
+  observacoes   String?
+  status        String      @default("PENDENTE")
+  createdAt     DateTime    @default(now())
+}
+
+model Servico {
+  id           String        @id @default(uuid())
+  nome         String
+  descricao    String?
+  valor        Float
+  categoria    String
+  atendimentos Atendimento[]
+  createdAt    DateTime      @default(now())
+}
+
+model Produto {
+  id         String    @id @default(uuid())
+  nome       String
+  quantidade Int
+  unidade    String
+  precoCusto Float
+  validade   DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+model Campanha {
+  id        String   @id @default(uuid())
+  nome      String
+  tema      String
+  mensagem  String
+  desconto  String?
+  status    String   @default("RASCUNHO")
+  createdAt DateTime @default(now())
+}
