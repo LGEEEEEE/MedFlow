@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+const PORT = MediaMetadata.env.PORT || 3001
+
 export const api = axios.create({
-  baseURL: 'http://localhost:3001',
+  baseURL: `http://localhost:${PORT}`,
 });
 
 api.interceptors.request.use(async config => {

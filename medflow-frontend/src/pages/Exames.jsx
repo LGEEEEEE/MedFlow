@@ -9,29 +9,29 @@ export default function Exames() {
   const [laudoPdf, setLaudoPdf] = useState('');
 
   const PORT = import.meta.env.VITE_PORT || 3001;
-const URLPADRAO = `http://localhost:${PORT}`;
+  const URLPADRAO = `http://localhost:${PORT}`;
 
   const carregarFilaSADT = async () => {
     try {
       const res = await api.get('/atendimentos');
       const atendimentosTotais = res.data.dados || res.data || [];
-      
+
       let examesExtraidos = [];
 
       atendimentosTotais.forEach(atendimento => {
         // A MÁGICA ACONTECE AQUI: O paciente só aparece se o status geral for AGUARDANDO_EXAME
         if (atendimento.status === 'AGUARDANDO_EXAME' && atendimento.exames && atendimento.exames.length > 0) {
           atendimento.exames.forEach(exame => {
-             examesExtraidos.push({
-               ...exame,
-               paciente: atendimento.paciente,
-               medicoSintomas: atendimento.sintomas
-             });
+            examesExtraidos.push({
+              ...exame,
+              paciente: atendimento.paciente,
+              medicoSintomas: atendimento.sintomas
+            });
           });
         }
       });
 
-      
+
 
       examesExtraidos.sort((a, b) => {
         if (a.prioridade === 'Vermelho') return -1;
@@ -64,23 +64,32 @@ const URLPADRAO = `http://localhost:${PORT}`;
     setExameAtual(pedido);
   };
 
+  // Função nova para converter o PDF em Base64
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLaudoPdf(reader.result); // Salva o arquivo real para enviar ao banco
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const finalizarExame = async (e) => {
     e.preventDefault();
     try {
-      // Pega o que o médico já tinha escrito e anexa o laudo novo embaixo
-      const prontuarioComLaudo = (exameAtual.medicoSintomas || '') + 
-        `\n\n--- LAUDO DO EXAME: ${exameAtual.exame.toUpperCase()} ---\n${resultado}`;
-
-      await api.put(`/atendimentos/${exameAtual.atendimentoId}/status`, {
-        status: 'AGUARDANDO_RETORNO',
-        sintomas: prontuarioComLaudo // Salva o laudo dentro do histórico do atendimento
+      // Agora sim chamamos a rota NOVA que vc criou no backend!
+      await api.put(`/exames/${exameAtual.id}/laudo`, {
+        laudoPdf: laudoPdf, // Manda o Base64 do PDF
+        resultado: resultado // Manda o texto digitado
       });
-      
+
       setExameAtual(null);
       setResultado('');
       setLaudoPdf('');
       carregarFilaSADT();
-      alert('Exame finalizado! O paciente retornou para a fila do Medico.');
+      alert('Laudo anexado e paciente enviado ao consultório com sucesso!');
     } catch (e) {
       alert('Erro ao salvar o laudo do exame. Verifique o servidor.');
     }
@@ -176,7 +185,7 @@ const URLPADRAO = `http://localhost:${PORT}`;
               <div style={{ borderLeft: '2px solid #dfe6e9', paddingLeft: '20px' }}>
                 <h4 style={{ margin: '0 0 10px 0', color: '#34495e' }}>Dados Operacionais</h4>
                 <p style={{ margin: 0, fontSize: '14px' }}><strong>Categoria:</strong> {exameAtual.categoria}</p>
-                <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}><strong>Prioridade:</strong> <span style={{color: getBadgeColor(exameAtual.prioridade).color, fontWeight: 'bold'}}>{exameAtual.prioridade}</span></p>
+                <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}><strong>Prioridade:</strong> <span style={{ color: getBadgeColor(exameAtual.prioridade).color, fontWeight: 'bold' }}>{exameAtual.prioridade}</span></p>
                 <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}><strong>Solicitado em:</strong> {new Date(exameAtual.createdAt).toLocaleString()}</p>
               </div>
             </div>
@@ -195,10 +204,10 @@ const URLPADRAO = `http://localhost:${PORT}`;
 
               <div>
                 <label style={labelStyle}>Anexar PDF (Opcional - Laudo Externo/Imagens)</label>
-                <input 
-                  type="file" 
+                <input
+                  type="file"
                   accept=".pdf,image/*"
-                  onChange={e => setLaudoPdf(e.target.value)}
+                  onChange={handleFileChange}
                   style={{ ...inputStyle, padding: '8px' }}
                 />
               </div>

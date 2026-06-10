@@ -17,6 +17,11 @@ export default function PainelAdmin() {
     cpf: '', registro: '', telefone: '', especialidade: ''
   });
 
+  const [modalTransacao, setModalTransacao] = useState(false);
+  const [formTransacao, setFormTransacao] = useState({
+    descricao: '', fonte: '', valor: '', tipo: 'entrada', data: new Date().toISOString().split('T')[0]
+  });
+
   const [modalEstoque, setModalEstoque] = useState(false);
   const [formEstoque, setFormEstoque] = useState({ nome: '', quantidade: '' });
 
@@ -59,13 +64,8 @@ export default function PainelAdmin() {
       ];
       setEstoque(estoqueData);
 
-      const extratoData = [
-        { id: 1, data: new Date().toISOString().split('T')[0], descricao: 'Consulta Cardiológica', fonte: 'Particular (PIX)', valor: 350.00, tipo: 'entrada' },
-        { id: 2, data: new Date().toISOString().split('T')[0], descricao: 'Exame de Imagem (Raio-X)', fonte: 'Convênio SulAmérica', valor: 120.00, tipo: 'faturar' },
-        { id: 3, data: new Date().toISOString().split('T')[0], descricao: 'Pagamento Fornecedor (Seringas)', fonte: 'Despesa Operacional', valor: -850.00, tipo: 'saida' },
-        { id: 4, data: new Date(Date.now() - 86400000).toISOString().split('T')[0], descricao: 'Consulta Clínico Geral', fonte: 'Particular (Cartão)', valor: 200.00, tipo: 'entrada' }
-      ];
-      setExtrato(extratoData);
+      const resTransacoes = await api.get('/transacoes').catch(() => ({ data: [] }));
+      setExtrato(resTransacoes.data);
 
       setGuias([
         { id: '74892-A', carteirinha: 'GDF-938402-21', fatura: 'FAT-2026-001', paciente: 'Carlos Silva', convenio: 'GDF SAUDE', procedimento: 'Consulta Clínica', valor: 120.00, status: 'AGUARDANDO_ENVIO' },
@@ -161,6 +161,40 @@ export default function PainelAdmin() {
     if (filtroData.fim && item.data > filtroData.fim) return false;
     return true;
   });
+
+  const salvarTransacao = async (e) => {
+    e.preventDefault();
+    try {
+      if (formTransacao.id) {
+        await api.put(`/transacoes/${formTransacao.id}`, formTransacao);
+        toast.success('Transação atualizada!');
+      } else {
+        await api.post('/transacoes', formTransacao);
+        toast.success('Transação registrada!');
+      }
+      setModalTransacao(false);
+      carregarDados(); // Recarrega a tabela
+    } catch (error) {
+      toast.error('Erro ao salvar transação.');
+    }
+  };
+
+  const excluirTransacao = async (id) => {
+    if (window.confirm('Deseja realmente excluir este registro financeiro?')) {
+      try {
+        await api.delete(`/transacoes/${id}`);
+        carregarDados();
+        toast.success('Registro excluído.');
+      } catch (error) {
+        toast.error('Erro ao excluir.');
+      }
+    }
+  };
+
+  const editarTransacao = (t) => {
+    setFormTransacao({ ...t, data: t.data.split('T')[0] }); // Formata a data pro input
+    setModalTransacao(true);
+  };
 
   return (
     <div style={containerStyle}>
@@ -352,24 +386,15 @@ export default function PainelAdmin() {
             <div style={flexBetween}>
               <h3 style={sectionTitle}>Extrato e Relatórios (Fluxo de Caixa)</h3>
               <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }} className="no-print">
-                <input
-                  type="date"
-                  value={filtroData.inicio}
-                  onChange={e => setFiltroData({ ...filtroData, inicio: e.target.value })}
-                  style={inputFilterStyle}
-                />
+                <input type="date" value={filtroData.inicio} onChange={e => setFiltroData({ ...filtroData, inicio: e.target.value })} style={inputFilterStyle} />
                 <span style={{ color: '#7f8c8d', fontWeight: 'bold' }}>até</span>
-                <input
-                  type="date"
-                  value={filtroData.fim}
-                  onChange={e => setFiltroData({ ...filtroData, fim: e.target.value })}
-                  style={inputFilterStyle}
-                />
+                <input type="date" value={filtroData.fim} onChange={e => setFiltroData({ ...filtroData, fim: e.target.value })} style={inputFilterStyle} />
+
+                {/* NOVO BOTÃO AQUI */}
+                <button onClick={() => { setFormTransacao({ descricao: '', fonte: '', valor: '', tipo: 'entrada', data: new Date().toISOString().split('T')[0] }); setModalTransacao(true); }} style={btnPrimary}>+ Nova Transação</button>
                 <button onClick={imprimirRelatorio} style={btnSuccess}>Imprimir / Gerar PDF</button>
               </div>
             </div>
-
-            <h2 className="print-only" style={{ display: 'none', textAlign: 'center', marginBottom: '20px' }}>Relatório Financeiro MedFlow</h2>
 
             <table style={tableStyle}>
               <thead>
@@ -378,20 +403,26 @@ export default function PainelAdmin() {
                   <th style={thStyle}>Descrição</th>
                   <th style={thStyle}>Fonte / Destino</th>
                   <th style={thStyle}>Valor</th>
+                  <th style={thStyle} className="no-print">Ações</th> {/* NOVA COLUNA */}
                 </tr>
               </thead>
               <tbody>
                 {extratoFiltrado.length === 0 ? (
-                  <tr><td colSpan="4" style={emptyState}>Nenhuma transação encontrada no período selecionado.</td></tr>
+                  <tr><td colSpan="5" style={emptyState}>Nenhuma transação encontrada no período selecionado.</td></tr>
                 ) : (
                   extratoFiltrado.map(item => (
                     <tr key={item.id} style={trStyle}>
-                      <td style={tdStyle}>{item.data.split('-').reverse().join('/')}</td>
+                      <td style={tdStyle}>{item.data.split('T')[0].split('-').reverse().join('/')}</td>
                       <td style={tdStyle}>{item.descricao}</td>
                       <td style={tdStyle}>{item.fonte}</td>
                       <td style={{ ...tdStyle, color: item.tipo === 'entrada' ? '#27ae60' : item.tipo === 'saida' ? '#e74c3c' : '#2980b9', fontWeight: 'bold' }}>
                         {item.tipo === 'saida' ? '- ' : item.tipo === 'entrada' ? '+ ' : ''}
                         R$ {Math.abs(item.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </td>
+                      {/* AQUI ESTÃO OS BOTÕES DE AÇÃO */}
+                      <td style={tdStyle} className="no-print">
+                        <button onClick={() => editarTransacao(item)} style={{ ...btnStyle, background: '#f39c12', color: '#fff', marginRight: '5px' }}>Editar</button>
+                        <button onClick={() => excluirTransacao(item.id)} style={{ ...btnStyle, background: '#e74c3c', color: '#fff' }}>Excluir</button>
                       </td>
                     </tr>
                   ))
@@ -450,6 +481,43 @@ export default function PainelAdmin() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', gridColumn: '1 / -1' }}>
                 <button type="button" onClick={() => setModalUsuario(false)} style={btnDanger}>Cancelar</button>
                 <button type="submit" style={btnPrimary}>Salvar Usuário</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {modalTransacao && (
+        <div style={overlayStyle} className="no-print">
+          <div style={modalBoxStyle}>
+            <h3 style={sectionTitle}>{formTransacao.id ? 'Editar Transação' : 'Nova Receita / Despesa'}</h3>
+            <form onSubmit={salvarTransacao} style={formStyle}>
+              <div style={inputGroup}>
+                <label style={labelStyle}>Tipo de Movimentação</label>
+                <select value={formTransacao.tipo} onChange={e => setFormTransacao({ ...formTransacao, tipo: e.target.value })} style={inputStyle}>
+                  <option value="entrada">Receita (Entrada)</option>
+                  <option value="saida">Despesa (Saída)</option>
+                </select>
+              </div>
+              <div style={inputGroup}>
+                <label style={labelStyle}>Descrição</label>
+                <input type="text" value={formTransacao.descricao} onChange={e => setFormTransacao({ ...formTransacao, descricao: e.target.value })} required style={inputStyle} placeholder="Ex: Conta de Luz, Consulta Particular..." />
+              </div>
+              <div style={inputGroup}>
+                <label style={labelStyle}>Fonte / Destino</label>
+                <input type="text" value={formTransacao.fonte} onChange={e => setFormTransacao({ ...formTransacao, fonte: e.target.value })} required style={inputStyle} placeholder="Ex: Cartão, Pix, CEB..." />
+              </div>
+              <div style={inputGroup}>
+                <label style={labelStyle}>Valor (R$)</label>
+                <input type="number" step="0.01" value={formTransacao.valor} onChange={e => setFormTransacao({ ...formTransacao, valor: e.target.value })} required style={inputStyle} />
+              </div>
+              <div style={inputGroup}>
+                <label style={labelStyle}>Data</label>
+                <input type="date" value={formTransacao.data} onChange={e => setFormTransacao({ ...formTransacao, data: e.target.value })} required style={inputStyle} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button type="button" onClick={() => setModalTransacao(false)} style={btnDanger}>Cancelar</button>
+                <button type="submit" style={btnPrimary}>Salvar Registro</button>
               </div>
             </form>
           </div>

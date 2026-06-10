@@ -1,16 +1,13 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { whatsappQueue } from '../services/whatsappService';
+import { AtendimentoService } from '../services/atendimentoService';
 
-const prisma = new PrismaClient();
+const atendimentoService = new AtendimentoService();
 
 export class AtendimentoController {
+  
   async listar(req: Request, res: Response) {
     try {
-      const atendimentos = await prisma.atendimento.findMany({
-        include: { paciente: true, servico: true, exames: true },
-        orderBy: { createdAt: 'asc' }
-      });
+      const atendimentos = await atendimentoService.listar();
       return res.json(atendimentos);
     } catch (error) {
       return res.status(500).json({ erro: 'Erro ao listar atendimentos' });
@@ -20,49 +17,24 @@ export class AtendimentoController {
   async buscarCpf(req: Request, res: Response) {
     try {
       const { cpf } = req.params;
-      const paciente = await prisma.paciente.findUnique({ where: { cpf: cpf as string } });
-
-      if (!paciente) {
-        return res.status(404).json({ error: 'Paciente nao encontrado' });
-      }
+      const paciente = await atendimentoService.buscarCpf(cpf as string);
       return res.json(paciente);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message === 'Paciente nao encontrado') {
+        return res.status(404).json({ error: error.message });
+      }
       return res.status(500).json({ erro: 'Erro ao buscar paciente' });
     }
   }
-  // Adicione este método na classe AtendimentoController
+
   async salvarLaudoExame(req: Request, res: Response) {
     try {
       const { exameId } = req.params;
       const { laudoPdf, resultado } = req.body;
 
-      // 1. Atualiza apenas o exame específico com o PDF e finaliza ele
-      const exameAtualizado = await prisma.exame.update({
-        where: { id: exameId as string },
-        data: {
-          status: 'FINALIZADO',
-          laudoPdf: laudoPdf, // Aqui entra o Base64 ou URL do PDF
-        }
-      });
+      const exameAtualizado = await atendimentoService.salvarLaudoExame(exameId as string, laudoPdf, resultado);
 
-      // 2. Anexa o laudo em texto ao prontuário do atendimento (opcional, mas recomendado)
-      const atendimentoAtual = await prisma.atendimento.findUnique({
-        where: { id: exameAtualizado.atendimentoId }
-      });
-
-      const novoSintomas = (atendimentoAtual?.sintomas || '') +
-        `\n\n--- LAUDO DO EXAME: ${exameAtualizado.exame} ---\n${resultado || 'Vide PDF anexo.'}`;
-
-      // 3. Atualiza o atendimento principal para o paciente voltar ao consultório
-      await prisma.atendimento.update({
-        where: { id: exameAtualizado.atendimentoId },
-        data: {
-          status: 'AGUARDANDO_RETORNO',
-          sintomas: novoSintomas
-        }
-      });
-
-      // 4. Atualiza a tela de todo mundo
+      // Atualiza a tela de todo mundo (Infraestrutura/Rede fica no Controller)
       req.app.get('io').emit('atualizar_fila');
 
       return res.json(exameAtualizado);
@@ -74,75 +46,14 @@ export class AtendimentoController {
 
   async criar(req: Request, res: Response) {
     try {
-      const {
-        nome, cpf, data_nascimento, sexo, whatsapp, cep, endereco, numero,
-        bairro, cidade, uf, nome_mae, nome_responsavel, cpf_responsavel,
-        parentesco, convenio, numero_guia, servicoId, status
-      } = req.body;
-
-      if (!cpf) {
-        return res.status(400).json({ error: 'O CPF e obrigatorio' });
-      }
-
-      let paciente = await prisma.paciente.findUnique({ where: { cpf } });
-
-      if (paciente) {
-        const atendimentoAberto = await prisma.atendimento.findFirst({
-          where: {
-            pacienteId: paciente.id,
-            status: { in: ['ABERTO', 'AGUARDANDO_TRIAGEM', 'AGENDADO'] }
-          }
-        });
-
-        if (atendimentoAberto) {
-          return res.status(400).json({ error: 'Paciente ja possui atendimento ativo' });
-        }
-
-        paciente = await prisma.paciente.update({
-          where: { id: paciente.id },
-          data: {
-            nome: nome || paciente.nome,
-            whatsapp: whatsapp || paciente.whatsapp,
-            cep: cep || paciente.cep,
-            endereco: endereco || paciente.endereco,
-            numero: numero || paciente.numero,
-            bairro: bairro || paciente.bairro,
-            cidade: cidade || paciente.cidade,
-            uf: uf || paciente.uf
-          }
-        });
-      } else {
-        paciente = await prisma.paciente.create({
-          data: {
-            nome, cpf, data_nascimento: data_nascimento ? new Date(data_nascimento) : new Date('1900-01-01'),
-            sexo: sexo || 'N/A', whatsapp: whatsapp || '', cep: cep || '',
-            endereco: endereco || '', numero: numero || '', bairro: bairro || '',
-            cidade: cidade || '', uf: uf || '', nome_mae: nome_mae || '',
-            nome_responsavel: nome_responsavel || '', cpf_responsavel: cpf_responsavel || '',
-            parentesco: parentesco || ''
-          }
-        });
-      }
-
-      const atendimento = await prisma.atendimento.create({
-        data: {
-          pacienteId: paciente.id,
-          convenio: convenio || 'PARTICULAR',
-          numero_guia,
-          status: status || 'AGENDADO',
-          servicoId: servicoId || null
-        },
-        include: { paciente: true }
-      });
+      const atendimento = await atendimentoService.criarAtendimento(req.body);
 
       req.app.get('io').emit('atualizar_fila');
-
-      if (paciente.whatsapp) {
-        whatsappQueue.adicionar(paciente.whatsapp, 'agendamento_confirmado', [paciente.nome]);
+      return res.status(201).json(atendimento);
+    } catch (error: any) {
+      if (error.message === 'O CPF e obrigatorio' || error.message === 'Paciente ja possui atendimento ativo') {
+        return res.status(400).json({ error: error.message });
       }
-
-      return res.json(atendimento);
-    } catch (error) {
       return res.status(500).json({ erro: 'Erro ao criar atendimento' });
     }
   }
@@ -150,20 +61,9 @@ export class AtendimentoController {
   async atualizarStatus(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { status, sintomas, diagnostico, prescricao } = req.body;
-
-      const atendimento = await prisma.atendimento.update({
-        where: { id: id as string },
-        data: { status, sintomas, diagnostico, prescricao },
-        include: { paciente: true }
-      });
+      const atendimento = await atendimentoService.atualizarStatus(id as string, req.body);
 
       req.app.get('io').emit('atualizar_fila');
-
-      if (status === 'AGUARDANDO_RETORNO' && atendimento.paciente?.whatsapp) {
-        whatsappQueue.adicionar(atendimento.paciente.whatsapp, 'exames_finalizados', [atendimento.paciente.nome]);
-      }
-
       return res.json(atendimento);
     } catch (error) {
       return res.status(500).json({ erro: 'Erro ao atualizar status' });
@@ -173,15 +73,9 @@ export class AtendimentoController {
   async solicitarExame(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { categoria, exame, prioridade, justificativa, observacoes } = req.body;
-
-      const novoExame = await prisma.exame.create({
-        // ADICIONADO 'as string' NO atendimentoId AQUI
-        data: { atendimentoId: id as string, categoria, exame, prioridade, justificativa, observacoes }
-      });
+      const novoExame = await atendimentoService.solicitarExame(id as string, req.body);
 
       req.app.get('io').emit('novo_exame_sadt');
-
       return res.status(201).json(novoExame);
     } catch (error) {
       return res.status(500).json({ erro: 'Erro ao solicitar exame' });
@@ -191,7 +85,8 @@ export class AtendimentoController {
   async deletar(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      await prisma.atendimento.delete({ where: { id: id as string } }); // <-- ADICIONADO 'as string' AQUI
+      await atendimentoService.deletar(id as string);
+      
       req.app.get('io').emit('atualizar_fila');
       return res.status(204).send();
     } catch (error) {

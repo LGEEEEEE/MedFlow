@@ -8,6 +8,11 @@ export default function PainelMedico() {
   const [fila, setFila] = useState([]);
   const [historicoTotal, setHistoricoTotal] = useState([]);
 
+  const [medicoLogado] = useState(() => {
+    const userStorage = localStorage.getItem('@MedFlow:user');
+    return userStorage ? JSON.parse(userStorage) : null;
+  });
+
   const [pacienteAtual, setPacienteAtual] = useState(null);
 
   const [filtroBusca, setFiltroBusca] = useState('');
@@ -233,7 +238,7 @@ export default function PainelMedico() {
       <main className="content" style={{ flex: 1, backgroundColor: '#f1f5f9', overflowY: 'auto', padding: '0' }}>
         <header className="content-header" style={{ backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0', padding: '20px 30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 style={{ margin: 0, color: '#1e293b', fontSize: '22px' }}>{abaAtiva === 'consultorio' ? 'PAINEL MEDICO' : 'HISTORICO CLINICO'}</h1>
-          <div className="user-info">Medico: <strong>Dr. Marcio Henrique</strong></div>
+          <div className="user-info">Médico(a): <strong>{medicoLogado?.nome || 'Profissional não identificado'}</strong></div>
         </header>
 
         <div style={{ padding: '30px' }}>

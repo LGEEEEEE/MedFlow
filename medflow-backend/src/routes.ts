@@ -6,7 +6,10 @@ import { ServicoController } from './controllers/servicoController'; //importa t
 import { ProdutoController } from './controllers/produtoController'; //importa todos os controladores de produto para a sessão de rotas
 import { CampanhaController } from './controllers/campanhaController'; //importa todos os controladores de campanha para a sessão de rotas
 import { authMiddleware } from './middlewares/authMiddleware'; //importa todos os controladores de verificação com JWT para a sessão de rotas
-
+import { TransacaoController } from './controllers/transacaoController'; //importa todos os controladores de verificação com JWT para a sessão de rotas
+import { pacienteRoutes } from './routes/pacienteRoutes';
+import { exameRoutes } from './routes/exameRoutes';
+import { atendimentoRoutes } from './routes/atendimentoRoutes';
 const router = Router();
 
 const authController = new AuthController();
@@ -15,10 +18,20 @@ const usuarioController = new UsuarioController();
 const servicoController = new ServicoController();
 const produtoController = new ProdutoController();
 const campanhaController = new CampanhaController();
+const transacaoController = new TransacaoController();
 
 router.post('/login', authController.login);
 
 router.use(authMiddleware);
+router.use('/pacientes', pacienteRoutes); // Tudo que for /pacientes/... cai aqui
+router.use('/exames', exameRoutes);       // Tudo que for /exames/... cai aqui
+router.use('/atendimentos', atendimentoRoutes);
+
+// Rotas do Financeiro
+router.get('/transacoes', transacaoController.listar);
+router.post('/transacoes', transacaoController.criar);
+router.put('/transacoes/:id', transacaoController.atualizar);
+router.delete('/transacoes/:id', transacaoController.deletar);
 
 
 //Rotas de atendimento
@@ -29,6 +42,7 @@ router.put('/atendimentos/:id/status', atendimentoController.atualizarStatus);
 router.post('/atendimentos/:id/exames', atendimentoController.solicitarExame);
 router.delete('/atendimentos/:id', atendimentoController.deletar);
 router.get('/pacientes/:cpf', atendimentoController.buscarCpf);
+router.put('/exames/:exameId/laudo', atendimentoController.salvarLaudoExame);
 
 //Rotas de usuario
 

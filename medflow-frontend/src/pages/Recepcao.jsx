@@ -24,7 +24,10 @@ export default function Recepcao() {
     cpf: '', pacienteNome: '', celular: '',
     cep: '', endereco: '', numero: '', bairro: '', cidade: '', uf: '',
     convenio: 'PARTICULAR', tipoExame: '', data: '', preparo: ''
+
   });
+
+  const [medicos, setMedicos] = useState([]);
 
   const carregarKanban = async () => {
     try {
@@ -39,9 +42,20 @@ export default function Recepcao() {
     } catch (e) {
     }
   };
+  const carregarMedicos = async () => {
+    try {
+      const res = await api.get('/usuarios');
+      // Filtra apenas os utilizadores que têm o cargo 'MEDICO'
+      const listaMedicos = res.data.filter(u => u.cargo === 'MEDICO');
+      setMedicos(listaMedicos);
+    } catch (e) {
+      console.error("Erro ao carregar médicos", e);
+    }
+  };
 
   useEffect(() => {
     carregarKanban();
+    carregarMedicos();
 
     const socket = io(api.defaults.baseURL || 'http://localhost:3001');
 
@@ -335,8 +349,11 @@ export default function Recepcao() {
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <select value={formConsulta.medicoResponsavel} onChange={e => setFormConsulta({ ...formConsulta, medicoResponsavel: e.target.value })} required style={{ ...inputStyle, flex: 1 }}>
                       <option value="">Selecione o Profissional</option>
-                      <option value="Dra. Nadyla (Clinico Geral)">Dra. Nadyla (Clinico Geral)</option>
-                      <option value="Dr. Carlos (Cardiologia)">Dr. Carlos (Cardiologia)</option>
+                      {medicos.map(medico => (
+                        <option key={medico.id} value={medico.nome}>
+                          {medico.nome} {medico.registro ? `(CRM: ${medico.registro})` : ''}
+                        </option>
+                      ))}
                     </select>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '14px', color: '#e67e22', fontWeight: 'bold', cursor: 'pointer', border: '1px solid #e67e22', padding: '8px 12px', borderRadius: '6px', backgroundColor: formConsulta.encaixe ? '#fff3e0' : 'transparent' }}>
                       <input type="checkbox" checked={formConsulta.encaixe} onChange={e => setFormConsulta({ ...formConsulta, encaixe: e.target.checked })} />
