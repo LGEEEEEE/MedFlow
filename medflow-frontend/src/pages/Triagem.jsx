@@ -1,163 +1,114 @@
-import { useState, useEffect } from 'react';
-import { api } from '../services/api';
-import { io } from 'socket.io-client';
-
-const PORT = import.meta.env.VITE_PORT || 3001;
-const URLPADRAO = `http://localhost:${PORT}`;
+import { useTriagem } from '../hooks/useTriagem';
+import { Toaster } from 'react-hot-toast';
 
 export default function Triagem() {
-  const [fila, setFila] = useState([]);
-  const [pacienteAtual, setPacienteAtual] = useState(null);
-  const [formTriagem, setFormTriagem] = useState({
-    pressao: '',
-    temperatura: '',
-    saturacao: '',
-    peso: '',
-    queixa: ''
-  });
-
-  const carregarFila = async () => {
-    try {
-      const res = await api.get('/atendimentos');
-      const dados = res.data.dados || res.data || [];
-      setFila(dados.filter(a => a.status === 'ABERTO' || a.status === 'AGUARDANDO_TRIAGEM'));
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  useEffect(() => {
-    carregarFila();
-
-    const socket = io(api.defaults.baseURL || URLPADRAO);
-
-    socket.on('novo_atendimento', carregarFila);
-    socket.on('atualizar_fila', carregarFila);
-    socket.on('status_atualizado', carregarFila);
-
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
-
-  const selecionarPaciente = (paciente) => {
-    setPacienteAtual(paciente);
-    setFormTriagem({ pressao: '', temperatura: '', saturacao: '', peso: '', queixa: '' });
-  };
-
-  const salvarTriagem = async (e) => {
-    e.preventDefault();
-    try {
-      const resumoSintomas = `[TRIAGEM]\nPA: ${formTriagem.pressao} | Temp: ${formTriagem.temperatura}ºC | O2: ${formTriagem.saturacao}% | Peso: ${formTriagem.peso}kg\nQueixa: ${formTriagem.queixa}`;
-
-      await api.put(`/atendimentos/${pacienteAtual.id}/status`, {
-        status: 'AGUARDANDO_ATENDIMENTO',
-        sintomas: resumoSintomas
-      });
-
-      setPacienteAtual(null);
-      carregarFila();
-    } catch (error) {
-      alert('Erro ao salvar triagem');
-    }
-  };
+  const {
+    fila, pacienteAtual, selecionarPaciente,
+    formTriagem, handleChange, salvarTriagem
+  } = useTriagem();
 
   return (
-    <div style={containerStyle}>
-      <header style={headerStyle}>
-        <h2 style={{ margin: 0, color: '#2c3e50' }}>Triagem / Enfermagem</h2>
-      </header>
+    <div className="fade-animation" style={{ padding: '30px', minHeight: 'calc(100vh - 70px)' }}>
+      <Toaster position="top-right" />
 
-      <main style={mainContentStyle}>
-        {!pacienteAtual ? (
-          <section style={panelWhite}>
-            <h3 style={{ marginBottom: '20px', color: '#2c3e50' }}>Pacientes Aguardando Triagem</h3>
-            <table style={tableStyle}>
-              <thead>
-                <tr style={tableHeaderRow}>
-                  <th style={thStyle}>Ficha</th>
-                  <th style={thStyle}>Paciente</th>
-                  <th style={thStyle}>Acao</th>
-                </tr>
-              </thead>
-              <tbody>
-                {fila.length === 0 ? (
-                  <tr><td colSpan="3" style={emptyStateStyle}>Nenhum paciente aguardando triagem.</td></tr>
-                ) : (
-                  fila.map(p => (
-                    <tr key={p.id} style={tableRow}>
-                      <td style={tdStyle}>#{p.id.substring(0,5).toUpperCase()}</td>
-                      <td style={tdStyle}><strong>{p.paciente?.nome}</strong></td>
-                      <td style={tdStyle}>
-                        <button onClick={() => selecionarPaciente(p)} style={btnAction}>Avaliar</button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </section>
-        ) : (
-          <section style={panelWhite}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #f0f2f5', paddingBottom: '20px', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0, color: '#2c3e50' }}>Triagem: {pacienteAtual.paciente?.nome}</h2>
-              <button onClick={() => setPacienteAtual(null)} style={btnCancel}>Cancelar</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div>
+          <h2 style={{ margin: 0, color: '#2c3e50' }}>Triagem e Enfermagem</h2>
+          <p style={{ color: '#7f8c8d', margin: '5px 0 0 0' }}>Classificação de risco e recolha de sinais vitais.</p>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '25px', alignItems: 'start' }}>
+        
+        {/* COLUNA ESQUERDA: Fila de Espera */}
+        <section className="panel">
+          <h3 style={{ margin: '0 0 15px 0', color: '#1e293b', fontSize: '16px' }}>Aguardando Triagem ({fila.length})</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {fila.length === 0 ? (
+              <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '14px', padding: '20px 0' }}>Fila vazia.</p>
+            ) : (
+              fila.map(paciente => (
+                <div
+                  key={paciente.id}
+                  onClick={() => selecionarPaciente(paciente)}
+                  style={{
+                    padding: '15px', 
+                    backgroundColor: pacienteAtual?.id === paciente.id ? '#eff6ff' : '#fff',
+                    border: `1px solid ${pacienteAtual?.id === paciente.id ? '#3b82f6' : '#e2e8f0'}`,
+                    borderRadius: '8px', cursor: 'pointer', transition: '0.2s',
+                    boxShadow: pacienteAtual?.id === paciente.id ? '0 2px 4px rgba(59, 130, 246, 0.1)' : 'none'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                    <strong style={{ color: '#1e293b', fontSize: '14px' }}>{paciente.paciente?.nome || paciente.nome}</strong>
+                    <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#3b82f6' }}>#{paciente.id.substring(0, 5).toUpperCase()}</span>
+                  </div>
+                  <span style={{ fontSize: '12px', color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
+                    {paciente.convenio || 'PARTICULAR'}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* COLUNA DIREITA: Formulário de Sinais Vitais */}
+        <section className="panel" style={{ minHeight: '400px' }}>
+          {!pacienteAtual ? (
+            <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', flexDirection: 'column', gap: '10px', padding: '50px 0' }}>
+              <i className="bi bi-clipboard2-pulse" style={{ fontSize: '48px', color: '#cbd5e1' }}></i>
+              <p>Selecione um paciente na fila ao lado para iniciar a triagem.</p>
             </div>
-
-            <form onSubmit={salvarTriagem} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px' }}>
-                <div>
-                  <label style={labelStyle}>Pressao Arterial</label>
-                  <input type="text" placeholder="Ex: 12x8" value={formTriagem.pressao} onChange={e => setFormTriagem({...formTriagem, pressao: e.target.value})} required style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Temperatura (ºC)</label>
-                  <input type="text" placeholder="Ex: 36.5" value={formTriagem.temperatura} onChange={e => setFormTriagem({...formTriagem, temperatura: e.target.value})} required style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Saturacao O2 (%)</label>
-                  <input type="text" placeholder="Ex: 98" value={formTriagem.saturacao} onChange={e => setFormTriagem({...formTriagem, saturacao: e.target.value})} required style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Peso (kg)</label>
-                  <input type="text" placeholder="Ex: 75" value={formTriagem.peso} onChange={e => setFormTriagem({...formTriagem, peso: e.target.value})} style={inputStyle} />
-                </div>
+          ) : (
+            <div className="fade-animation">
+              <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '15px', marginBottom: '20px' }}>
+                <h3 style={{ margin: '0 0 5px 0', color: '#1e3a8a', fontSize: '18px' }}>Ficha de Sinais Vitais</h3>
+                <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>Paciente: <strong>{pacienteAtual.paciente?.nome || pacienteAtual.nome}</strong></p>
               </div>
 
-              <div>
-                <label style={labelStyle}>Queixa Principal / Observacoes</label>
-                <textarea 
-                  placeholder="Relato do paciente na triagem..." 
-                  value={formTriagem.queixa} 
-                  onChange={e => setFormTriagem({...formTriagem, queixa: e.target.value})} 
-                  required 
-                  style={{ ...inputStyle, height: '100px', resize: 'vertical' }} 
-                />
-              </div>
+              <form onSubmit={salvarTriagem} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px' }}>
+                  <div>
+                    <label className="form-label">Pressão (PA)</label>
+                    <input type="text" className="form-input" placeholder="Ex: 120/80" value={formTriagem.pressao} onChange={handleChange('pressao')} required />
+                  </div>
+                  <div>
+                    <label className="form-label">Temp. (ºC)</label>
+                    <input type="number" step="0.1" className="form-input" placeholder="Ex: 36.5" value={formTriagem.temperatura} onChange={handleChange('temperatura')} required />
+                  </div>
+                  <div>
+                    <label className="form-label">SpO2 (%)</label>
+                    <input type="number" className="form-input" placeholder="Ex: 98" value={formTriagem.saturacao} onChange={handleChange('saturacao')} required />
+                  </div>
+                  <div>
+                    <label className="form-label">Peso (kg)</label>
+                    <input type="number" step="0.1" className="form-input" placeholder="Ex: 70" value={formTriagem.peso} onChange={handleChange('peso')} />
+                  </div>
+                </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-                <button type="submit" style={btnSuccess}>Salvar Triagem e Enviar ao Medico</button>
-              </div>
-            </form>
-          </section>
-        )}
-      </main>
+                <div>
+                  <label className="form-label">Queixa Principal / Observações</label>
+                  <textarea
+                    className="form-input"
+                    rows="4"
+                    placeholder="Descreva os sintomas relatados pelo paciente..."
+                    value={formTriagem.queixa}
+                    onChange={handleChange('queixa')}
+                    required
+                    style={{ resize: 'vertical' }}
+                  ></textarea>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                  <button type="submit" className="btn-primary" style={{ padding: '12px 24px', fontSize: '14px' }}>
+                    Registar Triagem e Chamar Médico
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
-
-const containerStyle = { minHeight: '100vh', backgroundColor: '#f4f7f6', padding: '20px', fontFamily: 'system-ui, -apple-system, sans-serif' };
-const headerStyle = { marginBottom: '20px', backgroundColor: '#fff', padding: '15px 25px', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' };
-const mainContentStyle = { maxWidth: '1200px', margin: '0 auto' };
-const panelWhite = { backgroundColor: '#fff', padding: '30px', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' };
-const tableStyle = { width: '100%', borderCollapse: 'collapse', marginTop: '10px' };
-const tableHeaderRow = { backgroundColor: '#f8f9fa', borderBottom: '2px solid #dfe6e9' };
-const thStyle = { padding: '15px', textAlign: 'left', fontSize: '13px', color: '#7f8c8d', textTransform: 'uppercase' };
-const tableRow = { borderBottom: '1px solid #f0f2f5' };
-const tdStyle = { padding: '16px 15px', verticalAlign: 'middle' };
-const emptyStateStyle = { padding: '40px', textAlign: 'center', color: '#95a5a6' };
-const labelStyle = { display: 'block', fontSize: '13px', color: '#34495e', marginBottom: '8px', fontWeight: '600' };
-const inputStyle = { padding: '12px 15px', borderRadius: '8px', border: '1px solid #dfe6e9', fontSize: '15px', width: '100%', boxSizing: 'border-box', backgroundColor: '#fbfcfc' };
-const btnAction = { padding: '8px 16px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' };
-const btnSuccess = { padding: '15px 30px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' };
-const btnCancel = { padding: '10px 20px', backgroundColor: 'transparent', color: '#e74c3c', border: '1px solid #e74c3c', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' };

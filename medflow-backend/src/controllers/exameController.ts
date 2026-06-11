@@ -7,11 +7,11 @@ export class ExameController {
   async solicitar(req: Request, res: Response) {
     try {
       const { atendimentoId } = req.params;
-      const novoExame = await exameService.solicitarExame(atendimentoId, req.body);
+      const novoExame = await exameService.solicitarExame(atendimentoId as string, req.body);
 
       // Dispara evento pro front-end (MedFlow) atualizar a tela do SADT
       req.app.get('io').emit('novo_exame_sadt');
-      
+
       return res.status(201).json(novoExame);
     } catch (error) {
       return res.status(500).json({ erro: 'Erro ao solicitar exame' });
@@ -21,9 +21,14 @@ export class ExameController {
   async salvarLaudo(req: Request, res: Response) {
     try {
       const { exameId } = req.params;
-      const { laudoPdf, resultado } = req.body;
+      const { resultado } = req.body;
 
-      const exameAtualizado = await exameService.salvarLaudo(exameId as string, laudoPdf, resultado);
+      // O multer injeta o "req.file" com as informações do arquivo salvo!
+      // Usamos || '' para garantir que envie uma string caso não venha arquivo
+      const caminhoDoPdf = req.file ? req.file.filename : '';
+
+      // Deixamos APENAS esta chamada aqui passando o caminho do PDF gerado pelo Multer:
+      const exameAtualizado = await exameService.salvarLaudo(exameId as string, caminhoDoPdf, resultado);
 
       // Atualiza a fila principal já que o paciente mudou de status
       req.app.get('io').emit('atualizar_fila');

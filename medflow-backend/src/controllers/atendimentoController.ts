@@ -59,16 +59,22 @@ export class AtendimentoController {
   }
 
   async atualizarStatus(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const atendimento = await atendimentoService.atualizarStatus(id as string, req.body);
-
-      req.app.get('io').emit('atualizar_fila');
-      return res.json(atendimento);
-    } catch (error) {
-      return res.status(500).json({ erro: 'Erro ao atualizar status' });
-    }
+  try {
+    const { id } = req.params;
+    
+    // CORREÇÃO: Passe o req.body inteiro (que contém { status, sintomas })
+    const atendimento = await atendimentoService.atualizarStatus(id as string, req.body);
+    
+    // Notifica o front-end
+    const io = req.app.get('io');
+    io.emit('status_atualizado');
+    
+    return res.json(atendimento);
+  } catch (error) {
+    console.error("Erro no controller ao atualizar status:", error);
+    return res.status(500).json({ erro: 'Erro ao atualizar status' });
   }
+}
 
   async solicitarExame(req: Request, res: Response) {
     try {

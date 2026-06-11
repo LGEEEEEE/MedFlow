@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const PORT = MediaMetadata.env.PORT || 3001
+// Usamos import.meta.env para acessar variáveis de ambiente no Vite
+const PORT = import.meta.env.VITE_PORT || 3001;
 
 export const api = axios.create({
   baseURL: `http://localhost:${PORT}`,
@@ -8,11 +9,9 @@ export const api = axios.create({
 
 api.interceptors.request.use(async config => {
   const token = localStorage.getItem('@MedFlow:token');
-  
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  
   return config;
 });
 

@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { ProdutoService } from '../services/produtoService';
 
-const prisma = new PrismaClient();
+const produtoService = new ProdutoService();
 
 export class ProdutoController {
   async listar(req: Request, res: Response) {
     try {
-      const produtos = await prisma.produto.findMany();
+      const produtos = await produtoService.listar();
       return res.json(produtos);
     } catch (error) {
       return res.status(500).json({ erro: 'Erro ao listar estoque' });
@@ -14,39 +14,21 @@ export class ProdutoController {
   }
 
   async criar(req: Request, res: Response) {
-  try {
-    const { nome, quantidade, unidade, precoCusto, validade } = req.body;
-
-    const produto = await prisma.produto.create({
-      data: {
-        nome,
-        quantidade: Number(quantidade),
-        // Se 'unidade' vier vazio, assume 'un'. Se 'precoCusto' vier vazio, assume 0.
-        unidade: unidade || 'un', 
-        precoCusto: Number(precoCusto || 0), 
-        validade: validade ? new Date(validade) : null
-      }
-    });
-    return res.json(produto);
-  } catch (error) {
-    console.error(error); // Isso vai mostrar o erro real no log do terminal
-    return res.status(500).json({ erro: 'Erro ao cadastrar produto' });
+    try {
+      const produto = await produtoService.criar(req.body);
+      return res.json(produto);
+    } catch (error) {
+      console.error(error); 
+      return res.status(500).json({ erro: 'Erro ao cadastrar produto' });
+    }
   }
-}
 
   async baixaAutomatica(req: Request, res: Response) {
     try {
       const { id } = req.params;
       const { quantidade } = req.body;
 
-      const produto = await prisma.produto.update({
-        where: { id: id as string },
-        data: {
-          quantidade: {
-            decrement: Number(quantidade || 1)
-          }
-        }
-      });
+      const produto = await produtoService.baixaAutomatica(id as string, quantidade);
 
       return res.json(produto);
     } catch (error) {
